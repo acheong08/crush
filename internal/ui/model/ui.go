@@ -128,6 +128,11 @@ type (
 	sessionFilesUpdatesMsg struct {
 		sessionFiles []SessionFile
 	}
+
+	// reloadSessionMessagesMsg is sent to reload messages for the current session.
+	reloadSessionMessagesMsg struct {
+		messages []message.Message
+	}
 )
 
 // UI represents the main user interface model.
@@ -510,6 +515,11 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			paths = append(paths, f.LatestVersion.Path)
 		}
 		cmds = append(cmds, m.startLSPs(paths))
+
+	case reloadSessionMessagesMsg:
+		if cmd := m.setSessionMessages(msg.messages); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 
 	case sendMessageMsg:
 		cmds = append(cmds, m.sendMessage(msg.Content, msg.Attachments...))
@@ -922,6 +932,22 @@ func (m *UI) setSessionMessages(msgs []message.Message) tea.Cmd {
 	return tea.Sequence(cmds...)
 }
 
+// reloadSessionMessages reloads the messages for the current session.
+func (m *UI) reloadSessionMessages() tea.Cmd {
+	return func() tea.Msg {
+		if !m.hasSession() {
+			return nil
+		}
+
+		msgs, err := m.com.App.Messages.List(context.Background(), m.session.ID)
+		if err != nil {
+			return util.ReportError(err)
+		}
+
+		return reloadSessionMessagesMsg{messages: msgs}
+	}
+}
+
 // loadNestedToolCalls recursively loads nested tool calls for agent/agentic_fetch tools.
 func (m *UI) loadNestedToolCalls(items []chat.MessageItem) {
 	for _, item := range items {
@@ -1303,6 +1329,13 @@ func (m *UI) handleDialogMsg(msg tea.Msg) tea.Cmd {
 		if cmd := m.newSession(); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
+		m.dialog.CloseDialog(dialog.CommandsID)
+	case dialog.ActionUndo:
+		if m.isAgentBusy() {
+			cmds = append(cmds, util.ReportWarn("Agent is busy, please wait before undoing..."))
+			break
+		}
+		cmds = append(cmds, m.handleUndoCommand())
 		m.dialog.CloseDialog(dialog.CommandsID)
 	case dialog.ActionSummarize:
 		if m.isAgentBusy() {
@@ -1730,6 +1763,17 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 				value = strings.TrimSpace(value)
 				if value == "exit" || value == "quit" {
 					return m.openQuitDialog()
+				}
+
+				// Handle slash commands
+				if strings.HasPrefix(value, "/") {
+					command := strings.TrimSpace(value)
+					switch command {
+					case "/undo":
+						return m.handleUndoCommand()
+					default:
+						return util.ReportWarn(fmt.Sprintf("Unknown command: %s", command))
+					}
 				}
 
 				attachments := m.attachments.List()
@@ -2835,6 +2879,56 @@ func (m *UI) renderEditorView(width int) string {
 // cacheSidebarLogo renders and caches the sidebar logo at the specified width.
 func (m *UI) cacheSidebarLogo(width int) {
 	m.sidebarLogo = renderLogo(m.com.Styles, true, width)
+}
+
+// handleUndoCommand deletes the last user message and all messages after it.
+func (m *UI) handleUndoCommand() tea.Cmd {
+	return func() tea.Msg {
+		if !m.hasSession() {
+			slog.Info("Undo: no active session")
+			return util.ReportWarn("No active session to undo")
+		}
+
+		ctx := context.Background()
+		slog.Info("Undo: starting", "session_id", m.session.ID)
+
+		// Get user messages ordered by created_at DESC
+		userMessages, err := m.com.App.Messages.ListUserMessages(ctx, m.session.ID)
+		if err != nil {
+			slog.Error("Undo: failed to list user messages", "error", err)
+			return util.ReportError(fmt.Errorf("Failed to list messages: %w", err))
+		}
+
+		slog.Info("Undo: found user messages", "count", len(userMessages))
+
+		if len(userMessages) == 0 {
+			slog.Info("Undo: no messages to undo")
+			return util.ReportWarn("No messages to undo")
+		}
+
+		// Get the last user message (first in DESC order)
+		lastUserMessage := userMessages[0]
+		contentPreview := lastUserMessage.Content().Text
+		if len(contentPreview) > 50 {
+			contentPreview = contentPreview[:50] + "..."
+		}
+		slog.Info("Undo: removing last user message and all after",
+			"message_id", lastUserMessage.ID,
+			"content_preview", contentPreview,
+			"created_at", lastUserMessage.CreatedAt)
+
+		// Delete the last user message and all messages after it
+		slog.Info("Undo: deleting last user message and messages after", "session_id", m.session.ID, "message_id", lastUserMessage.ID)
+		err = m.com.App.Messages.DeleteMessagesAfter(ctx, m.session.ID, lastUserMessage.ID)
+		if err != nil {
+			slog.Error("Undo: delete failed", "error", err)
+			return util.ReportError(fmt.Errorf("Failed to undo: %w", err))
+		}
+
+		slog.Info("Undo: delete successful, reloading messages")
+		// Reload session messages to reflect the changes in UI
+		return m.reloadSessionMessages()
+	}
 }
 
 // sendMessage sends a message with the given content and attachments.

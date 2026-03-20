@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/charmbracelet/crush/internal/db"
@@ -30,6 +31,7 @@ type Service interface {
 	ListAllUserMessages(ctx context.Context) ([]Message, error)
 	Delete(ctx context.Context, id string) error
 	DeleteSessionMessages(ctx context.Context, sessionID string) error
+	DeleteMessagesAfter(ctx context.Context, sessionID, messageID string) error
 }
 
 type service struct {
@@ -109,6 +111,20 @@ func (s *service) DeleteSessionMessages(ctx context.Context, sessionID string) e
 		}
 	}
 	return nil
+}
+
+func (s *service) DeleteMessagesAfter(ctx context.Context, sessionID, messageID string) error {
+	slog.Info("DeleteMessagesAfter: called", "session_id", sessionID, "message_id", messageID)
+	err := s.q.DeleteMessagesAfter(ctx, db.DeleteMessagesAfterParams{
+		SessionID: sessionID,
+		ID:        messageID,
+	})
+	if err != nil {
+		slog.Error("DeleteMessagesAfter: failed", "error", err)
+	} else {
+		slog.Info("DeleteMessagesAfter: success")
+	}
+	return err
 }
 
 func (s *service) Update(ctx context.Context, message Message) error {
