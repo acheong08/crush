@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/charmbracelet/crush/internal/db"
@@ -114,17 +113,10 @@ func (s *service) DeleteSessionMessages(ctx context.Context, sessionID string) e
 }
 
 func (s *service) DeleteMessagesAfter(ctx context.Context, sessionID, messageID string) error {
-	slog.Info("DeleteMessagesAfter: called", "session_id", sessionID, "message_id", messageID)
-	err := s.q.DeleteMessagesAfter(ctx, db.DeleteMessagesAfterParams{
+	return s.q.DeleteMessagesAfter(ctx, db.DeleteMessagesAfterParams{
 		SessionID: sessionID,
 		ID:        messageID,
 	})
-	if err != nil {
-		slog.Error("DeleteMessagesAfter: failed", "error", err)
-	} else {
-		slog.Info("DeleteMessagesAfter: success")
-	}
-	return err
 }
 
 func (s *service) Update(ctx context.Context, message Message) error {

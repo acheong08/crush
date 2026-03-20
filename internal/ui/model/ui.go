@@ -882,7 +882,6 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // setSessionMessages sets the messages for the current session in the chat
 func (m *UI) setSessionMessages(msgs []message.Message) tea.Cmd {
-	slog.Info("setSessionMessages: called", "count", len(msgs))
 	var cmds []tea.Cmd
 	// Build tool result map to link tool calls with their results
 	msgPtrs := make([]*message.Message, len(msgs))
@@ -925,13 +924,11 @@ func (m *UI) setSessionMessages(msgs []message.Message) tea.Cmd {
 		}
 	}
 
-	slog.Info("setSessionMessages: setting chat messages", "items", len(items))
 	m.chat.SetMessages(items...)
 	if cmd := m.chat.ScrollToBottomAndAnimate(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
 	m.chat.SelectLast()
-	slog.Info("setSessionMessages: done")
 	return tea.Sequence(cmds...)
 }
 
@@ -939,18 +936,14 @@ func (m *UI) setSessionMessages(msgs []message.Message) tea.Cmd {
 func (m *UI) reloadSessionMessages() tea.Cmd {
 	return func() tea.Msg {
 		if !m.hasSession() {
-			slog.Info("reloadSessionMessages: no session")
 			return nil
 		}
 
-		slog.Info("reloadSessionMessages: loading messages", "session_id", m.session.ID)
 		msgs, err := m.com.App.Messages.List(context.Background(), m.session.ID)
 		if err != nil {
-			slog.Error("reloadSessionMessages: failed to load", "error", err)
 			return util.ReportError(err)
 		}
 
-		slog.Info("reloadSessionMessages: loaded messages", "count", len(msgs))
 		return reloadSessionMessagesMsg{messages: msgs}
 	}
 }
@@ -2892,54 +2885,35 @@ func (m *UI) cacheSidebarLogo(width int) {
 func (m *UI) handleUndoCommand() tea.Cmd {
 	return func() tea.Msg {
 		if !m.hasSession() {
-			slog.Info("Undo: no active session")
 			return util.ReportWarn("No active session to undo")
 		}
 
 		ctx := context.Background()
-		slog.Info("Undo: starting", "session_id", m.session.ID)
 
 		// Get user messages ordered by created_at DESC
 		userMessages, err := m.com.App.Messages.ListUserMessages(ctx, m.session.ID)
 		if err != nil {
-			slog.Error("Undo: failed to list user messages", "error", err)
 			return util.ReportError(fmt.Errorf("Failed to list messages: %w", err))
 		}
 
-		slog.Info("Undo: found user messages", "count", len(userMessages))
-
 		if len(userMessages) == 0 {
-			slog.Info("Undo: no messages to undo")
 			return util.ReportWarn("No messages to undo")
 		}
 
 		// Get the last user message (first in DESC order)
 		lastUserMessage := userMessages[0]
-		contentPreview := lastUserMessage.Content().Text
-		if len(contentPreview) > 50 {
-			contentPreview = contentPreview[:50] + "..."
-		}
-		slog.Info("Undo: removing last user message and all after",
-			"message_id", lastUserMessage.ID,
-			"content_preview", contentPreview,
-			"created_at", lastUserMessage.CreatedAt)
 
 		// Delete the last user message and all messages after it
-		slog.Info("Undo: deleting last user message and messages after", "session_id", m.session.ID, "message_id", lastUserMessage.ID)
 		err = m.com.App.Messages.DeleteMessagesAfter(ctx, m.session.ID, lastUserMessage.ID)
 		if err != nil {
-			slog.Error("Undo: delete failed", "error", err)
 			return util.ReportError(fmt.Errorf("Failed to undo: %w", err))
 		}
 
-		slog.Info("Undo: delete successful, reloading messages")
 		// Reload session messages to reflect the changes in UI
 		msgs, err := m.com.App.Messages.List(ctx, m.session.ID)
 		if err != nil {
-			slog.Error("Undo: failed to reload messages", "error", err)
 			return util.ReportError(fmt.Errorf("Failed to reload messages: %w", err))
 		}
-		slog.Info("Undo: reloaded messages", "count", len(msgs))
 		return reloadSessionMessagesMsg{messages: msgs}
 	}
 }
