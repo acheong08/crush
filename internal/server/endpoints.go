@@ -245,6 +245,15 @@ func (c *controllerV1) endpoints() []apigen.Endpoint {
 			Fails(404, 500).
 			Handle(c.handleGetWorkspaceAllUserMessages),
 
+		apigen.Delete("/v1/workspaces/{id}/sessions/{sid}/messages/{mid}").
+			Summary("Delete messages at or after a given message").
+			Tags("sessions").
+			PathParam("id", "Workspace ID").
+			PathParam("sid", "Session ID").
+			PathParam("mid", "Message ID").
+			Fails(404, 500).
+			Handle(c.handleDeleteWorkspaceSessionMessagesAfter),
+
 		apigen.Get("/v1/workspaces/{id}/sessions/{sid}/filetracker/files").
 			Summary("List tracked files for session").
 			Tags("filetracker").
