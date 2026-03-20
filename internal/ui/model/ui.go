@@ -882,6 +882,7 @@ func (m *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // setSessionMessages sets the messages for the current session in the chat
 func (m *UI) setSessionMessages(msgs []message.Message) tea.Cmd {
+	slog.Info("setSessionMessages: called", "count", len(msgs))
 	var cmds []tea.Cmd
 	// Build tool result map to link tool calls with their results
 	msgPtrs := make([]*message.Message, len(msgs))
@@ -924,11 +925,13 @@ func (m *UI) setSessionMessages(msgs []message.Message) tea.Cmd {
 		}
 	}
 
+	slog.Info("setSessionMessages: setting chat messages", "items", len(items))
 	m.chat.SetMessages(items...)
 	if cmd := m.chat.ScrollToBottomAndAnimate(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
 	m.chat.SelectLast()
+	slog.Info("setSessionMessages: done")
 	return tea.Sequence(cmds...)
 }
 
@@ -936,14 +939,18 @@ func (m *UI) setSessionMessages(msgs []message.Message) tea.Cmd {
 func (m *UI) reloadSessionMessages() tea.Cmd {
 	return func() tea.Msg {
 		if !m.hasSession() {
+			slog.Info("reloadSessionMessages: no session")
 			return nil
 		}
 
+		slog.Info("reloadSessionMessages: loading messages", "session_id", m.session.ID)
 		msgs, err := m.com.App.Messages.List(context.Background(), m.session.ID)
 		if err != nil {
+			slog.Error("reloadSessionMessages: failed to load", "error", err)
 			return util.ReportError(err)
 		}
 
+		slog.Info("reloadSessionMessages: loaded messages", "count", len(msgs))
 		return reloadSessionMessagesMsg{messages: msgs}
 	}
 }
@@ -2927,7 +2934,13 @@ func (m *UI) handleUndoCommand() tea.Cmd {
 
 		slog.Info("Undo: delete successful, reloading messages")
 		// Reload session messages to reflect the changes in UI
-		return m.reloadSessionMessages()
+		msgs, err := m.com.App.Messages.List(ctx, m.session.ID)
+		if err != nil {
+			slog.Error("Undo: failed to reload messages", "error", err)
+			return util.ReportError(fmt.Errorf("Failed to reload messages: %w", err))
+		}
+		slog.Info("Undo: reloaded messages", "count", len(msgs))
+		return reloadSessionMessagesMsg{messages: msgs}
 	}
 }
 
