@@ -1765,17 +1765,6 @@ func (m *UI) handleKeyPressMsg(msg tea.KeyPressMsg) tea.Cmd {
 					return m.openQuitDialog()
 				}
 
-				// Handle slash commands
-				if strings.HasPrefix(value, "/") {
-					command := strings.TrimSpace(value)
-					switch command {
-					case "/undo":
-						return m.handleUndoCommand()
-					default:
-						return util.ReportWarn(fmt.Sprintf("Unknown command: %s", command))
-					}
-				}
-
 				attachments := m.attachments.List()
 				m.attachments.Reset()
 				if len(value) == 0 && !message.ContainsTextAttachment(attachments) {
