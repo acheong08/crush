@@ -156,6 +156,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.setSessionChannelStmt, err = db.PrepareContext(ctx, setSessionChannel); err != nil {
 		return nil, fmt.Errorf("error preparing query SetSessionChannel: %w", err)
 	}
+	if q.restoreMessageStmt, err = db.PrepareContext(ctx, restoreMessage); err != nil {
+		return nil, fmt.Errorf("error preparing query RestoreMessage: %w", err)
+	}
 	if q.updateMessageStmt, err = db.PrepareContext(ctx, updateMessage); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateMessage: %w", err)
 	}
@@ -390,6 +393,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing setSessionChannelStmt: %w", cerr)
 		}
 	}
+	if q.restoreMessageStmt != nil {
+		if cerr := q.restoreMessageStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing restoreMessageStmt: %w", cerr)
+		}
+	}
 	if q.updateMessageStmt != nil {
 		if cerr := q.updateMessageStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing updateMessageStmt: %w", cerr)
@@ -487,6 +495,7 @@ type Queries struct {
 	listUserMessagesBySessionStmt        *sql.Stmt
 	recordFileReadStmt                   *sql.Stmt
 	renameSessionStmt                    *sql.Stmt
+	restoreMessageStmt                   *sql.Stmt
 	setSessionChannelStmt                *sql.Stmt
 	updateMessageStmt                    *sql.Stmt
 	updateSessionStmt                    *sql.Stmt
@@ -540,6 +549,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		listUserMessagesBySessionStmt:        q.listUserMessagesBySessionStmt,
 		recordFileReadStmt:                   q.recordFileReadStmt,
 		renameSessionStmt:                    q.renameSessionStmt,
+		restoreMessageStmt:                   q.restoreMessageStmt,
 		setSessionChannelStmt:                q.setSessionChannelStmt,
 		updateMessageStmt:                    q.updateMessageStmt,
 		updateSessionStmt:                    q.updateSessionStmt,
