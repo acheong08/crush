@@ -254,6 +254,15 @@ func (c *controllerV1) endpoints() []apigen.Endpoint {
 			Fails(404, 500).
 			Handle(c.handleDeleteWorkspaceSessionMessagesAfter),
 
+		apigen.Post("/v1/workspaces/{id}/sessions/{sid}/messages/restore").
+			Summary("Restore previously deleted messages").
+			Tags("sessions").
+			PathParam("id", "Workspace ID").
+			PathParam("sid", "Session ID").
+			Accepts(proto.RestoreMessagesRequest{}).
+			Fails(400, 404, 500).
+			Handle(c.handleRestoreWorkspaceSessionMessages),
+
 		apigen.Get("/v1/workspaces/{id}/sessions/{sid}/filetracker/files").
 			Summary("List tracked files for session").
 			Tags("filetracker").
