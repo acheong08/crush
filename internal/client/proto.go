@@ -847,6 +847,20 @@ func (c *Client) ListUserMessages(ctx context.Context, id string, sessionID stri
 	return msgs, nil
 }
 
+// DeleteMessagesAfter deletes every message in the session created at
+// or after the given message, inclusive.
+func (c *Client) DeleteMessagesAfter(ctx context.Context, id string, sessionID string, messageID string) error {
+	rsp, err := c.delete(ctx, fmt.Sprintf("/workspaces/%s/sessions/%s/messages/after/%s", id, sessionID, messageID), nil, nil)
+	if err != nil {
+		return fmt.Errorf("failed to delete messages: %w", err)
+	}
+	defer rsp.Body.Close()
+	if rsp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to delete messages: status code %d", rsp.StatusCode)
+	}
+	return nil
+}
+
 // ListAllUserMessages retrieves all user-role messages across sessions as proto types.
 func (c *Client) ListAllUserMessages(ctx context.Context, id string) ([]proto.Message, error) {
 	rsp, err := c.get(ctx, fmt.Sprintf("/workspaces/%s/messages/user", id), nil, nil)

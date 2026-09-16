@@ -130,3 +130,14 @@ func (b *Backend) ListAllUserMessages(ctx context.Context, workspaceID string) (
 
 	return ws.Messages.ListAllUserMessages(ctx)
 }
+
+// DeleteMessagesAfter deletes every message in the session created at
+// or after the given message, inclusive.
+func (b *Backend) DeleteMessagesAfter(ctx context.Context, workspaceID, sessionID, messageID string) error {
+	ws, err := b.GetWorkspace(workspaceID)
+	if err != nil {
+		return err
+	}
+
+	return ws.Messages.DeleteMessagesAfter(ctx, sessionID, messageID)
+}

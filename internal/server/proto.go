@@ -403,6 +403,19 @@ func (c *controllerV1) handleGetWorkspaceAllUserMessages(w http.ResponseWriter, 
 	jsonEncode(w, messagesToProto(messages))
 }
 
+// handleDeleteWorkspaceSessionMessagesAfter deletes every message in the
+// session at or after the given message, inclusive.
+func (c *controllerV1) handleDeleteWorkspaceSessionMessagesAfter(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	sid := r.PathValue("sid")
+	mid := r.PathValue("mid")
+	if err := c.backend.DeleteMessagesAfter(r.Context(), id, sid, mid); err != nil {
+		c.handleError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 // handleGetWorkspaceSessionFileTrackerFiles lists files read in a session.
 func (c *controllerV1) handleGetWorkspaceSessionFileTrackerFiles(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
