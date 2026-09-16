@@ -134,6 +134,7 @@ type Workspace interface {
 	ListMessages(ctx context.Context, sessionID string) ([]message.Message, error)
 	ListUserMessages(ctx context.Context, sessionID string) ([]message.Message, error)
 	ListAllUserMessages(ctx context.Context) ([]message.Message, error)
+	DeleteMessagesAfter(ctx context.Context, sessionID, messageID string) error
 
 	// RoutesChannelEvents reports whether the workspace's backing
 	// process routes MCP channel events into sessions itself. When

@@ -16,6 +16,7 @@ type Querier interface {
 	DeleteMCPDisabledServer(ctx context.Context, name string) error
 	DeleteMCPEnabledServer(ctx context.Context, name string) error
 	DeleteMessage(ctx context.Context, id string) error
+	DeleteMessagesAfter(ctx context.Context, arg DeleteMessagesAfterParams) error
 	DeleteSession(ctx context.Context, id string) error
 	DeleteSessionFiles(ctx context.Context, sessionID string) error
 	DeleteSessionMessages(ctx context.Context, sessionID string) error

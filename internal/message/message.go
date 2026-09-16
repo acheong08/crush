@@ -57,6 +57,7 @@ type Service interface {
 	GetLastAssistantMessage(ctx context.Context, sessionID string) (Message, error)
 	Delete(ctx context.Context, id string) error
 	DeleteSessionMessages(ctx context.Context, sessionID string) error
+	DeleteMessagesAfter(ctx context.Context, sessionID, messageID string) error
 
 	// Flush synchronously drains any pending debounced state for the
 	// given message ID, performs the SQL write, and publishes the
@@ -238,6 +239,15 @@ func (s *service) DeleteSessionMessages(ctx context.Context, sessionID string) e
 		}
 	}
 	return nil
+}
+
+// DeleteMessagesAfter deletes every message in the session created at
+// or after the given message, inclusive.
+func (s *service) DeleteMessagesAfter(ctx context.Context, sessionID, messageID string) error {
+	return s.q.DeleteMessagesAfter(ctx, db.DeleteMessagesAfterParams{
+		SessionID: sessionID,
+		ID:        messageID,
+	})
 }
 
 // Update accepts a new state for a message and either flushes
