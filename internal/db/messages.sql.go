@@ -78,10 +78,9 @@ func (q *Queries) DeleteMessage(ctx context.Context, id string) error {
 }
 
 const deleteMessagesAfter = `-- name: DeleteMessagesAfter :exec
-DELETE FROM messages AS target
-WHERE target.session_id = ? AND target.created_at >= (
-    SELECT m.created_at FROM messages AS m WHERE m.id = ?
-)
+DELETE FROM messages
+WHERE session_id = ?
+  AND rowid >= (SELECT m.rowid FROM messages m WHERE m.id = ?)
 `
 
 type DeleteMessagesAfterParams struct {
@@ -108,7 +107,7 @@ const getLastAssistantMessageBySession = `-- name: GetLastAssistantMessageBySess
 SELECT id, session_id, role, parts, model, created_at, updated_at, finished_at, provider, is_summary_message, prism_model_id, prism_model_name, prism_hypercredit_savings, prism_dollar_savings
 FROM messages
 WHERE session_id = ? AND role = 'assistant' AND is_summary_message = 0
-ORDER BY created_at DESC
+ORDER BY created_at DESC, rowid DESC
 LIMIT 1
 `
 
@@ -166,7 +165,7 @@ const listAllUserMessages = `-- name: ListAllUserMessages :many
 SELECT id, session_id, role, parts, model, created_at, updated_at, finished_at, provider, is_summary_message, prism_model_id, prism_model_name, prism_hypercredit_savings, prism_dollar_savings
 FROM messages
 WHERE role = 'user'
-ORDER BY created_at DESC
+ORDER BY created_at DESC, rowid DESC
 LIMIT 200
 `
 
@@ -214,7 +213,7 @@ const listMessagesBySession = `-- name: ListMessagesBySession :many
 SELECT id, session_id, role, parts, model, created_at, updated_at, finished_at, provider, is_summary_message, prism_model_id, prism_model_name, prism_hypercredit_savings, prism_dollar_savings
 FROM messages
 WHERE session_id = ?
-ORDER BY created_at ASC
+ORDER BY created_at ASC, rowid ASC
 `
 
 func (q *Queries) ListMessagesBySession(ctx context.Context, sessionID string) ([]Message, error) {
@@ -313,7 +312,7 @@ const listUserMessagesBySession = `-- name: ListUserMessagesBySession :many
 SELECT id, session_id, role, parts, model, created_at, updated_at, finished_at, provider, is_summary_message, prism_model_id, prism_model_name, prism_hypercredit_savings, prism_dollar_savings
 FROM messages
 WHERE session_id = ? AND role = 'user'
-ORDER BY created_at DESC
+ORDER BY created_at DESC, rowid DESC
 LIMIT 200
 `
 

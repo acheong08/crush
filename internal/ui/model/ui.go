@@ -5372,42 +5372,46 @@ func (m *UI) handleUndoCommand() tea.Cmd {
 		ctx := context.Background()
 		sessionID := m.session.ID
 
-		// Get all messages in ascending order before mutating anything.
-		allMsgs, err := m.com.Workspace.ListMessages(ctx, sessionID)
+		// Snapshot the conversation before mutating anything. The delete is
+		// keyed on insertion order, so the only reliable way to know which
+		// messages disappeared is to diff against a fresh read.
+		before, err := m.com.Workspace.ListMessages(ctx, sessionID)
 		if err != nil {
 			return util.ReportError(fmt.Errorf("Failed to list messages: %w", err))
 		}
 
-		// Get user messages ordered by created_at DESC to find the last one.
-		userMessages, err := m.com.Workspace.ListUserMessages(ctx, sessionID)
-		if err != nil {
-			return util.ReportError(fmt.Errorf("Failed to list messages: %w", err))
-		}
-
-		if len(userMessages) == 0 {
-			return util.ReportWarn("No messages to undo")
-		}
-
-		// The last user message (first in DESC order).
-		lastUserMessage := userMessages[0]
-
-		// Split allMsgs into remaining (before lastUserMessage) and deleted
-		// (at or after lastUserMessage, mirroring the SQL >= comparison).
-		splitIdx := len(allMsgs)
-		for i, msg := range allMsgs {
-			if msg.CreatedAt >= lastUserMessage.CreatedAt {
-				splitIdx = i
+		var target *message.Message
+		for i := len(before) - 1; i >= 0; i-- {
+			if before[i].Role == message.User {
+				target = &before[i]
 				break
 			}
 		}
-		remaining := allMsgs[:splitIdx]
-		deleted := make([]message.Message, len(allMsgs[splitIdx:]))
-		copy(deleted, allMsgs[splitIdx:])
+		if target == nil {
+			return util.ReportWarn("No messages to undo")
+		}
 
-		// Delete the last user message and all messages after it.
-		err = m.com.Workspace.DeleteMessagesAfter(ctx, sessionID, lastUserMessage.ID)
-		if err != nil {
+		if err := m.com.Workspace.DeleteMessagesAfter(ctx, sessionID, target.ID); err != nil {
 			return util.ReportError(fmt.Errorf("Failed to undo: %w", err))
+		}
+
+		remaining, err := m.com.Workspace.ListMessages(ctx, sessionID)
+		if err != nil {
+			return util.ReportError(fmt.Errorf("Failed to reload messages: %w", err))
+		}
+
+		kept := make(map[string]struct{}, len(remaining))
+		for _, msg := range remaining {
+			kept[msg.ID] = struct{}{}
+		}
+		deleted := make([]message.Message, 0, len(before)-len(remaining))
+		for _, msg := range before {
+			if _, ok := kept[msg.ID]; !ok {
+				deleted = append(deleted, msg)
+			}
+		}
+		if len(deleted) == 0 {
+			return util.ReportWarn("No messages to undo")
 		}
 
 		return undoSuccessMsg{

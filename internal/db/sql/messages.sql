@@ -7,7 +7,7 @@ WHERE id = ? LIMIT 1;
 SELECT *
 FROM messages
 WHERE session_id = ?
-ORDER BY created_at ASC;
+ORDER BY created_at ASC, rowid ASC;
 
 -- name: ListMessagesBySessionFromSummary :many
 -- Messages from the summary onward, which is all a compacted session sends.
@@ -61,7 +61,7 @@ WHERE session_id = ?;
 SELECT *
 FROM messages
 WHERE session_id = ? AND role = 'user'
-ORDER BY created_at DESC
+ORDER BY created_at DESC, rowid DESC
 LIMIT 200;
 
 -- name: ListAllUserMessages :many
@@ -70,21 +70,23 @@ LIMIT 200;
 SELECT *
 FROM messages
 WHERE role = 'user'
-ORDER BY created_at DESC
+ORDER BY created_at DESC, rowid DESC
 LIMIT 200;
 
 -- name: GetLastAssistantMessageBySession :one
 SELECT *
 FROM messages
 WHERE session_id = ? AND role = 'assistant' AND is_summary_message = 0
-ORDER BY created_at DESC
+ORDER BY created_at DESC, rowid DESC
 LIMIT 1;
 
 -- name: DeleteMessagesAfter :exec
-DELETE FROM messages AS target
-WHERE target.session_id = ? AND target.created_at >= (
-    SELECT m.created_at FROM messages AS m WHERE m.id = ?
-);
+-- created_at only has one-second resolution, so messages written within the
+-- same second are not orderable by it. Insertion order (rowid) is the
+-- authoritative conversation order.
+DELETE FROM messages
+WHERE session_id = ?
+  AND rowid >= (SELECT m.rowid FROM messages m WHERE m.id = ?);
 
 -- name: RestoreMessage :exec
 INSERT OR IGNORE INTO messages (
