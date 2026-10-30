@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -14,14 +15,21 @@ import (
 	"github.com/charmbracelet/crush/internal/config"
 	crushlog "github.com/charmbracelet/crush/internal/log"
 	"github.com/charmbracelet/crush/internal/server"
+	"github.com/charmbracelet/crush/internal/tailcatx"
 	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 )
 
-var serverHost string
+var (
+	serverHost  string
+	allowPeers  []string
+	tailcatPort uint16
+)
 
 func init() {
-	serverCmd.Flags().StringVarP(&serverHost, "host", "H", server.DefaultHost(), "Server host  (HTTP, TCP or Unix socket)")
+	serverCmd.Flags().StringVarP(&serverHost, "host", "H", server.DefaultHost(), "Server host (HTTP, TCP, Unix socket, or tailcat)")
+	serverCmd.Flags().StringSliceVar(&allowPeers, "allow-peer", nil, "tailcat node keys allowed to connect (repeatable or comma-separated; also CRUSH_TAILCAT_ALLOW)")
+	serverCmd.Flags().Uint16Var(&tailcatPort, "tailcat-port", tailcatx.DefaultPort, "port to listen on inside the tailcat tunnel")
 	rootCmd.AddCommand(serverCmd)
 }
 
@@ -40,6 +48,9 @@ Usage:
 
   # Serve over a Unix socket (default)
   crush server --host unix:///tmp/crush.sock
+
+  # Serve over an encrypted tailcat tunnel, restricted to your devices
+  crush server --host tailcat:// --allow-peer nodekey:aaaa,nodekey:bbbb
 
 While the server is running, browse the HTTP API docs at /v1/docs/
 (e.g. http://127.0.0.1:8080/v1/docs/). The OpenAPI 3.1 spec is served
@@ -77,8 +88,22 @@ at /v1/docs/openapi.json.
 		srv.SetLogger(slog.Default())
 		slog.Info("Starting Crush server...", "addr", serverHost)
 
+		var ln net.Listener
+		if hostURL.Scheme == "tailcat" {
+			tunnel, err := startTailcatTunnel(cmd.Context(), hostURL.Host)
+			if err != nil {
+				return err
+			}
+			defer tunnel.Close()
+			ln = tunnel.Listener()
+		}
+
 		errch := make(chan error, 1)
 		go func() {
+			if ln != nil {
+				errch <- srv.Serve(ln)
+				return
+			}
 			errch <- srv.ListenAndServe()
 		}()
 
@@ -108,6 +133,31 @@ at /v1/docs/openapi.json.
 
 		return nil
 	},
+}
+
+// startTailcatTunnel brings up a tailcat listener and prints the
+// address clients need. The allowlist is empty by default: anyone
+// holding the address can connect, so the usual setup is one key per
+// device you own.
+func startTailcatTunnel(ctx context.Context, host string) (*tailcatx.Server, error) {
+	peers, err := tailcatx.ParsePeers(append(allowPeers, os.Getenv("CRUSH_TAILCAT_ALLOW")))
+	if err != nil {
+		return nil, err
+	}
+	if len(peers) == 0 {
+		slog.Warn("No --allow-peer given: any device with this address can connect")
+	}
+	_, port, err := tailcatx.ParseHost(host)
+	if err != nil {
+		return nil, err
+	}
+	tunnel, err := tailcatx.Listen(ctx, filepath.Dir(config.GlobalConfigData()), port, peers)
+	if err != nil {
+		return nil, err
+	}
+	slog.Info("Tailcat tunnel up", "url", tunnel.URL(), "node_key", tunnel.NodeKey(), "allowed_peers", len(peers))
+	fmt.Fprintln(os.Stdout, tunnel.URL())
+	return tunnel, nil
 }
 
 // awaitStop blocks until the root context is cancelled by a termination

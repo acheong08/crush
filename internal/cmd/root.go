@@ -3,7 +3,9 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	_ "embed"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -249,11 +251,14 @@ func supportsProgressBar() bool {
 	return isWindowsTerminal || xstrings.ContainsAnyOf(strings.ToLower(termProg), "ghostty", "iterm2", "rio")
 }
 
-// useClientServer returns true when the client/server architecture is
-// enabled via the CRUSH_CLIENT_SERVER environment variable.
+// useClientServer reports whether this process should talk to a server
+// instead of running the agent in-process. A tailcat host always names
+// a remote server, so the tunnel implies client/server mode.
 func useClientServer() bool {
-	v, _ := strconv.ParseBool(os.Getenv("CRUSH_CLIENT_SERVER"))
-	return v
+	if v, _ := strconv.ParseBool(os.Getenv("CRUSH_CLIENT_SERVER")); v {
+		return true
+	}
+	return strings.HasPrefix(clientHost, "tailcat://")
 }
 
 // setupWorkspaceWithProgressBar wraps setupWorkspace with an optional
@@ -652,6 +657,13 @@ func perHostServerDir(hostURL *url.URL) (string, error) {
 // suitable for use as a directory name. It mirrors the input shape of
 // the --host flag so client and server compute the same key.
 func safeHostName(hostURL *url.URL) string {
+	// A tailcat address is a long capability blob; hashing keeps the
+	// per-host log path inside filesystem name limits while staying
+	// stable across invocations.
+	if hostURL.Scheme == "tailcat" {
+		sum := sha256.Sum256([]byte(hostURL.Host))
+		return "tailcat-" + hex.EncodeToString(sum[:8])
+	}
 	return safeNameRegexp.ReplaceAllString(
 		hostURL.Scheme+"://"+hostURL.Host+hostURL.Path, "_",
 	)

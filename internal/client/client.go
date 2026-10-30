@@ -16,6 +16,7 @@ import (
 	"github.com/charmbracelet/crush/internal/config"
 	"github.com/charmbracelet/crush/internal/proto"
 	"github.com/charmbracelet/crush/internal/server"
+	"github.com/charmbracelet/crush/internal/tailcatx"
 	"github.com/google/uuid"
 )
 
@@ -29,6 +30,7 @@ type Client struct {
 	network  string
 	addr     string
 	clientID string
+	tunnel   *tailcatx.Dialer
 }
 
 // DefaultClient creates a new [Client] connected to the default server address.
@@ -56,6 +58,13 @@ func NewClient(path, network, address string) (*Client, error) {
 	tr.DialContext = c.dialer
 	if c.network == "npipe" || c.network == "unix" {
 		tr.DisableCompression = true
+	}
+	if c.network == "tailcat" {
+		dialer, err := tailcatx.NewDialer(filepath.Dir(config.GlobalConfigData()), c.addr)
+		if err != nil {
+			return nil, err
+		}
+		c.tunnel = dialer
 	}
 	c.h = &http.Client{
 		Transport: tr,
@@ -219,6 +228,11 @@ func (c *Client) dialer(ctx context.Context, network, address string) (net.Conn,
 		return dialPipeContext(ctx, c.addr)
 	case "unix":
 		return d.DialContext(ctx, "unix", c.addr)
+	case "tailcat":
+		if c.tunnel == nil {
+			return nil, errors.New("tailcat dialer not initialized")
+		}
+		return c.tunnel.DialContext(ctx, network, address)
 	default:
 		return d.DialContext(ctx, network, address)
 	}
