@@ -184,7 +184,6 @@ type Workspace struct {
 	ID     string
 	Path   string
 	Cfg    *config.ConfigStore
-	Env    []string
 	Skills *skills.Manager
 
 	// resolvedPath is the path used as the dedup key in
@@ -488,7 +487,6 @@ func (b *Backend) CreateWorkspace(args proto.Workspace) (*Workspace, proto.Works
 		ID:           id,
 		Path:         args.Path,
 		Cfg:          cfg,
-		Env:          args.Env,
 		Skills:       skillsMgr,
 		resolvedPath: key,
 		ctx:          wsCtx,
@@ -1234,7 +1232,6 @@ func workspaceToProto(ws *Workspace) proto.Workspace {
 		DataDir:  cfg.Options.DataDirectory,
 		Debug:    cfg.Options.Debug,
 		Config:   cfg,
-		Env:      ws.Env,
 		Version:  version.Version,
 	}
 	if ws.Skills != nil {
@@ -1259,7 +1256,6 @@ func logFirstWinsMismatch(existing *Workspace, args proto.Workspace) {
 	if existingYOLO == args.YOLO &&
 		existingCfg.Options.Debug == args.Debug &&
 		existingCfg.Options.DataDirectory == args.DataDir &&
-		stringSlicesEqual(existing.Env, args.Env) &&
 		stringSlicesEqual(existingChannels, args.Channels) {
 		return
 	}
@@ -1273,8 +1269,6 @@ func logFirstWinsMismatch(existing *Workspace, args proto.Workspace) {
 		"requested_debug", args.Debug,
 		"existing_data_dir", existingCfg.Options.DataDirectory,
 		"requested_data_dir", args.DataDir,
-		"existing_env", existing.Env,
-		"requested_env", args.Env,
 		"existing_channels", existingChannels,
 		"requested_channels", args.Channels,
 	)

@@ -445,11 +445,10 @@ func TestPathDedupe_DifferentPaths_DifferentWorkspaces(t *testing.T) {
 	require.NotEqual(t, wsA.ID, wsB.ID)
 }
 
-// TestPathDedupe_FirstWinsKeepsOriginalEnv verifies that the second
-// create at the same path returns the *originating* client's Env in
-// its proto and does not mutate the existing workspace's YOLO/Debug
-// flags.
-func TestPathDedupe_FirstWinsKeepsOriginalEnv(t *testing.T) {
+// TestPathDedupe_FirstWins verifies that the second create at the same
+// path returns the originating workspace and does not mutate its
+// YOLO/Debug flags.
+func TestPathDedupe_FirstWins(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
@@ -462,24 +461,19 @@ func TestPathDedupe_FirstWinsKeepsOriginalEnv(t *testing.T) {
 	b.SetCreateGrace(2 * time.Second)
 	t.Cleanup(func() { drainBackend(t, b) })
 
-	originalEnv := []string{"FOO=bar"}
 	argsA := protoWS(cwd, dataDir, uuid.New().String())
 	argsA.YOLO = true
-	argsA.Env = originalEnv
 	wsA, protoA, err := b.CreateWorkspace(argsA)
 	require.NoError(t, err)
 	require.True(t, protoA.YOLO)
-	require.Equal(t, originalEnv, protoA.Env)
 
 	argsB := protoWS(cwd, dataDir, uuid.New().String())
 	argsB.YOLO = false
 	argsB.Debug = true
-	argsB.Env = []string{"BAZ=qux"}
 	_, protoB, err := b.CreateWorkspace(argsB)
 	require.NoError(t, err)
 	require.Equal(t, protoA.ID, protoB.ID)
 	require.True(t, protoB.YOLO, "first wins: YOLO must remain true")
-	require.Equal(t, originalEnv, protoB.Env, "proto must carry the originating client's Env")
 	require.Equal(t, wsA.Cfg.Overrides().SkipPermissionRequests, true)
 }
 
@@ -688,7 +682,7 @@ func xdgIsolated(t *testing.T) {
 
 // TestFirstWinsMismatch_LogsOnFlagDifferences verifies that the
 // debug mismatch line is emitted when any of YOLO, Debug, DataDir,
-// or Env differs between the first and second CreateWorkspace at
+// or Channels differs between the first and second CreateWorkspace at
 // the same path, and that the existing workspace's Debug flag is
 // not overwritten.
 func TestFirstWinsMismatch_LogsOnFlagDifferences(t *testing.T) {
@@ -708,10 +702,6 @@ func TestFirstWinsMismatch_LogsOnFlagDifferences(t *testing.T) {
 			name:   "datadir",
 			mutate: func(p *proto.Workspace) { p.DataDir = "" },
 		},
-		{
-			name:   "env",
-			mutate: func(p *proto.Workspace) { p.Env = []string{"NEW=val"} },
-		},
 	}
 
 	for _, tc := range tests {
@@ -726,14 +716,12 @@ func TestFirstWinsMismatch_LogsOnFlagDifferences(t *testing.T) {
 			t.Cleanup(func() { drainBackend(t, b) })
 
 			argsA := protoWS(cwd, dataDir, uuid.New().String())
-			argsA.Env = []string{"FOO=bar"}
 			wsA, _, err := b.CreateWorkspace(argsA)
 			require.NoError(t, err)
 			originalDebug := wsA.Cfg.Config().Options.Debug
 			originalYOLO := wsA.Cfg.Overrides().SkipPermissionRequests
 
 			argsB := protoWS(cwd, dataDir, uuid.New().String())
-			argsB.Env = []string{"FOO=bar"} // identical by default
 			tc.mutate(&argsB)
 			_, _, err = b.CreateWorkspace(argsB)
 			require.NoError(t, err)
@@ -763,12 +751,10 @@ func TestFirstWinsMismatch_NoLogWhenIdentical(t *testing.T) {
 	t.Cleanup(func() { drainBackend(t, b) })
 
 	argsA := protoWS(cwd, dataDir, uuid.New().String())
-	argsA.Env = []string{"FOO=bar"}
 	_, _, err := b.CreateWorkspace(argsA)
 	require.NoError(t, err)
 
 	argsB := protoWS(cwd, dataDir, uuid.New().String())
-	argsB.Env = []string{"FOO=bar"}
 	_, _, err = b.CreateWorkspace(argsB)
 	require.NoError(t, err)
 

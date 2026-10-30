@@ -21,7 +21,6 @@ type Workspace struct {
 	Version  string         `json:"version,omitempty"`
 	ClientID string         `json:"client_id,omitempty"`
 	Config   *config.Config `json:"config,omitempty"`
-	Env      []string       `json:"env,omitempty"`
 	// Channels lists the MCP servers opted in as channels for this workspace
 	// (from the --channels flag).
 	Channels []string `json:"channels,omitempty"`

@@ -435,8 +435,6 @@ func connectToServer(cmd *cobra.Command) (*client.Client, *proto.Workspace, func
 		Debug:    debug,
 		YOLO:     yolo,
 		Channels: channels,
-		Version:  version.Version,
-		Env:      os.Environ(),
 	}
 
 	ws, err := createWorkspaceOnLiveServer(cmd.Context(), c, wsReq, func() error {

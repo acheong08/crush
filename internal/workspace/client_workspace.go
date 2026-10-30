@@ -1034,7 +1034,6 @@ func (w *ClientWorkspace) recreateArgs() proto.Workspace {
 		Debug:    ws.Debug,
 		YOLO:     ws.YOLO,
 		Channels: ws.Channels,
-		Env:      ws.Env,
 		Version:  version.Version,
 	}
 }
