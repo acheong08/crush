@@ -211,103 +211,21 @@ func TestBashTool_ChainedCommandsDenied(t *testing.T) {
 	require.Contains(t, resp.Content, "User denied permission")
 }
 
-func TestIsDangerousCommand(t *testing.T) {
-	tests := []struct {
-		name      string
-		command   string
-		dangerous bool
-	}{
-		{
-			name:      "simple banned command - curl",
-			command:   "curl https://example.com",
-			dangerous: true,
-		},
-		{
-			name:      "simple banned command - sudo",
-			command:   "sudo apt-get update",
-			dangerous: true,
-		},
-		{
-			name:      "npm global install with --global",
-			command:   "npm install --global typescript",
-			dangerous: true,
-		},
-		{
-			name:      "npm global install with -g",
-			command:   "npm install -g typescript",
-			dangerous: true,
-		},
-		{
-			name:      "npm local install",
-			command:   "npm install typescript",
-			dangerous: false,
-		},
-		{
-			name:      "go test with -exec",
-			command:   "go test -exec ./malicious ./...",
-			dangerous: true,
-		},
-		{
-			name:      "go test without -exec",
-			command:   "go test ./...",
-			dangerous: false,
-		},
-		{
-			name:      "safe command - ls",
-			command:   "ls -la",
-			dangerous: false,
-		},
-		{
-			name:      "safe command - echo",
-			command:   "echo hello",
-			dangerous: false,
-		},
-		{
-			name:      "safe command - git",
-			command:   "git status",
-			dangerous: false,
-		},
-		{
-			name:      "pip install with --user",
-			command:   "pip install --user requests",
-			dangerous: true,
-		},
-		{
-			name:      "pip install without --user",
-			command:   "pip install requests",
-			dangerous: false,
-		},
-		{
-			name:      "brew install",
-			command:   "brew install wget",
-			dangerous: true,
-		},
-		{
-			// Quoting the command name must not evade detection.
-			name:      "quoted dangerous command name",
-			command:   `"brew" install wget`,
-			dangerous: true,
-		},
-		{
-			// Quoted arguments must still be seen by argument blockers.
-			name:      "quoted dangerous argument",
-			command:   `go test "-exec" ./malicious ./...`,
-			dangerous: true,
-		},
-		{
-			// Command substitution can't be resolved without executing, so
-			// it is treated conservatively as dangerous.
-			name:      "command substitution is conservative",
-			command:   "$(echo brew) install wget",
-			dangerous: true,
-		},
-	}
+// TestBlockFuncsDisabled pins that the tool no longer enforces a
+// dangerous-command block list: it is trivially bypassable with absolute
+// paths, so enforcement belongs to the permission system instead.
+func TestBlockFuncsDisabled(t *testing.T) {
+	t.Parallel()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := shell.IsCommandBlocked(tt.command, blockFuncs(defaultBlockedCommands))
-			require.Equal(t, tt.dangerous, result, "command: %s", tt.command)
-		})
+	for _, command := range []string{
+		"curl https://example.com",
+		"sudo apt-get update",
+		"npm install --global typescript",
+		"go test -exec ./malicious ./...",
+		"pip install --user requests",
+		"brew install wget",
+	} {
+		require.False(t, shell.IsCommandBlocked(command, blockFuncs(defaultBlockedCommands)), "command: %s", command)
 	}
 }
 
@@ -403,67 +321,6 @@ func TestResolveBlockedCommands(t *testing.T) {
 		require.Equal(t, []string{"kubectl"}, got[len(defaultBlockedCommands):],
 			"additions append once; a duplicate of a default is dropped")
 	})
-
-	t.Run("unblocking a command stops it reading as dangerous", func(t *testing.T) {
-		t.Parallel()
-		blocked := resolveBlockedCommands(&config.Permissions{AllowedCommands: []string{"curl"}})
-		require.False(t, shell.IsCommandBlocked("curl https://example.com", blockFuncs(blocked)))
-		require.True(t, shell.IsCommandBlocked("sudo rm -rf /", blockFuncs(blocked)))
-	})
-}
-
-// TestBashTool_ApprovedDangerousCommandRuns pins the rule that a command the
-// user was warned about and approved anyway reaches the shell unguarded:
-// re-blocking it would override the answer they just gave.
-func TestBashTool_ApprovedDangerousCommandRuns(t *testing.T) {
-	workingDir := t.TempDir()
-	perms := &recordingPermissionService{
-		Broker: pubsub.NewBroker[permission.PermissionRequest](),
-		allow:  true,
-		mode:   permission.PermissionModeNormal,
-	}
-	attribution := &config.Attribution{TrailerStyle: config.TrailerStyleNone}
-	tool := NewBashTool(perms, workingDir, workingDir, attribution, "test-model", config.DefaultMaxBackgroundJobs, nil)
-	ctx := context.WithValue(context.Background(), SessionIDContextKey, "test-session")
-
-	// `ifconfig` is on the default dangerous list, so it is prompted for.
-	// Approving it must not then be overridden by the exec-time block list.
-	resp := runBashTool(t, tool, ctx, BashParams{
-		Description: "approved dangerous command",
-		Command:     "ifconfig --help",
-	})
-
-	require.Equal(t, 1, perms.requestCount, "a dangerous command must be prompted for")
-	require.Equal(t, "ifconfig", perms.lastDanger,
-		"the prompt must name what tripped the check")
-	require.NotContains(t, resp.Content, "is a dangerous command",
-		"an approved command must not be re-blocked at exec time")
-}
-
-// TestBashTool_UnflaggedCommandKeepsBlockList is the other side of that rule.
-// The static check expands commands with globbing off, so a glob hides the
-// dangerous name from it and yolo mode auto-approves the call unseen. The block
-// list stays on at exec time, where the glob has resolved and the real command
-// name is finally visible.
-func TestBashTool_UnflaggedCommandKeepsBlockList(t *testing.T) {
-	workingDir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(workingDir, "ifconfig"), []byte("#!/bin/sh\n"), 0o755))
-	perms := &recordingPermissionService{
-		Broker: pubsub.NewBroker[permission.PermissionRequest](),
-		allow:  true,
-		mode:   permission.PermissionModeYolo,
-	}
-	attribution := &config.Attribution{TrailerStyle: config.TrailerStyleNone}
-	tool := NewBashTool(perms, workingDir, workingDir, attribution, "test-model", config.DefaultMaxBackgroundJobs, nil)
-	ctx := context.WithValue(context.Background(), SessionIDContextKey, "test-session")
-
-	resp := runBashTool(t, tool, ctx, BashParams{
-		Description: "indirect dangerous command",
-		Command:     "ifconf?g --help",
-	})
-
-	require.Empty(t, perms.lastDanger, "the static check cannot see through a glob")
-	require.Contains(t, resp.Content, "is a dangerous command")
 }
 
 // TestBashTool_SysadminModeSkipsBlockList pins sysadmin mode as the deliberate
@@ -546,35 +403,44 @@ func newModeBashTool(t *testing.T, mode permission.PermissionMode) (fantasy.Agen
 	return tool, perms, ctx, workingDir
 }
 
-func TestBashTool_YoloModeBlocksDangerousCommandsWithoutPrompting(t *testing.T) {
-	tool, perms, ctx, workingDir := newModeBashTool(t, permission.PermissionModeYolo)
+// TestBashTool_YoloModeDoesNotPromptForDangerousCommands pins the rule that
+// yolo mode means stop asking. It drives the real permission service rather
+// than a mock, because the whole behaviour under test lives there.
+func TestBashTool_YoloModeDoesNotPromptForDangerousCommands(t *testing.T) {
+	workingDir := t.TempDir()
+	perms := permission.NewPermissionService(workingDir, nil, nil)
+	perms.SetPermissionMode(permission.PermissionModeYolo)
+
+	// Any prompt would land here. Nothing should.
 	prompts := perms.Subscribe(t.Context())
 
-	// Off the test goroutine, so a reinstated prompt fails fast instead of hanging.
-	type result struct {
-		content string
-		isError bool
-	}
-	done := make(chan result, 1)
+	attribution := &config.Attribution{TrailerStyle: config.TrailerStyleNone}
+	tool := NewBashTool(perms, workingDir, workingDir, attribution, "test-model", config.DefaultMaxBackgroundJobs, nil)
+	ctx := context.WithValue(t.Context(), SessionIDContextKey, "test-session")
+
+	// `ifconfig` is on the default dangerous list. In yolo it must run
+	// without asking, and without being re-blocked at exec time either.
+	// Run it off the test goroutine so a regression that reinstates the
+	// prompt fails here in a few seconds rather than hanging until the
+	// whole package times out.
+	content := make(chan string, 1)
 	go func() {
 		resp := runBashTool(t, tool, ctx, BashParams{
 			Description: "dangerous command in yolo mode",
-			Command:     "touch ran && ifconfig --help",
+			Command:     "ifconfig --help",
 		})
-		done <- result{resp.Content, resp.IsError}
+		content <- resp.Content
 	}()
 
-	var got result
+	var got string
 	select {
-	case got = <-done:
+	case got = <-content:
 	case <-time.After(30 * time.Second):
 		t.Fatal("yolo mode blocked waiting for a permission prompt that should never have been raised")
 	}
 
-	require.True(t, got.isError)
-	require.Contains(t, got.content, "ifconfig is a dangerous command")
-	require.Contains(t, got.content, "sysadmin mode", "the refusal must name the way out")
-	require.NoFileExists(t, filepath.Join(workingDir, "ran"), "nothing on a refused line may run")
+	require.NotContains(t, got, "is a dangerous command",
+		"a dangerous command must not be blocked in yolo mode")
 
 	select {
 	case p := <-prompts:
@@ -601,9 +467,9 @@ func TestBashTool_SysadminModeRunsDangerousCommands(t *testing.T) {
 	require.NotContains(t, resp.Content, "is a dangerous command")
 }
 
-// TestBashTool_NormalModeStillPromptsForDangerousCommands is the other half of
-// the rule: manual mode keeps asking.
-func TestBashTool_NormalModeStillPromptsForDangerousCommands(t *testing.T) {
+// TestBashTool_NormalModeStillPromptsForCommands pins that manual mode keeps
+// asking before running anything that is not a safe read-only command.
+func TestBashTool_NormalModeStillPromptsForCommands(t *testing.T) {
 	workingDir := t.TempDir()
 	perms := &recordingPermissionService{
 		Broker: pubsub.NewBroker[permission.PermissionRequest](),
@@ -615,36 +481,9 @@ func TestBashTool_NormalModeStillPromptsForDangerousCommands(t *testing.T) {
 	ctx := context.WithValue(t.Context(), SessionIDContextKey, "test-session")
 
 	runBashTool(t, tool, ctx, BashParams{
-		Description: "dangerous command in normal mode",
+		Description: "command in normal mode",
 		Command:     "ifconfig --help",
 	})
 
 	require.Equal(t, 1, perms.requestCount, "normal mode must still ask")
-	require.Equal(t, "ifconfig", perms.lastDanger,
-		"the prompt must name what tripped the check")
-}
-
-// TestBlockedCommandErrorNamesTheCommand checks that a command stopped at
-// exec time names the command that was recognised. The static check and the
-// run-time check have to agree about that, or the same command is described
-// two different ways depending on which one caught it.
-func TestBlockedCommandErrorNamesTheCommand(t *testing.T) {
-	workingDir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(workingDir, "ifconfig"), []byte("#!/bin/sh\n"), 0o755))
-	perms := &recordingPermissionService{
-		Broker: pubsub.NewBroker[permission.PermissionRequest](),
-		allow:  true,
-		mode:   permission.PermissionModeYolo,
-	}
-	attribution := &config.Attribution{TrailerStyle: config.TrailerStyleNone}
-	tool := NewBashTool(perms, workingDir, workingDir, attribution, "test-model", config.DefaultMaxBackgroundJobs, nil)
-	ctx := context.WithValue(t.Context(), SessionIDContextKey, "test-session")
-
-	resp := runBashTool(t, tool, ctx, BashParams{
-		Description: "indirect dangerous command",
-		Command:     "ifconf?g --help",
-	})
-
-	require.Contains(t, resp.Content, "ifconfig is a dangerous command",
-		"the error must name the command, not the spelling that reached it")
 }

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/crush/internal/config"
-	"github.com/charmbracelet/crush/internal/shell"
 	"github.com/stretchr/testify/require"
 )
 
@@ -76,11 +75,10 @@ func TestResolveBlockedCommandsNormalizesConfig(t *testing.T) {
 	t.Run("blocked_commands adds however it is spelled", func(t *testing.T) {
 		t.Parallel()
 		for _, spelling := range []string{"kubectl", "KUBECTL", " kubectl ", "/usr/local/bin/kubectl"} {
-			bf := blockFuncs(resolveBlockedCommands(&config.Permissions{
+			blocked := resolveBlockedCommands(&config.Permissions{
 				BlockedCommands: []string{spelling},
-			}))
-			require.Equal(t, "kubectl", shell.CheckCommand("kubectl apply -f x", bf).Reason,
-				"spelled %q", spelling)
+			})
+			require.Contains(t, blocked, "kubectl", "spelled %q", spelling)
 		}
 	})
 
