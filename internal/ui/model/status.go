@@ -169,9 +169,6 @@ func (s *Status) Draw(scr uv.Screen, area uv.Rectangle) {
 	case util.InfoTypeWarn:
 		indStyle = s.com.Styles.Status.WarnIndicator
 		msgStyle = s.com.Styles.Status.WarnMessage
-	case util.InfoTypeUpdate:
-		indStyle = s.com.Styles.Status.UpdateIndicator
-		msgStyle = s.com.Styles.Status.UpdateMessage
 	case util.InfoTypeInfo:
 		indStyle = s.com.Styles.Status.InfoIndicator
 		msgStyle = s.com.Styles.Status.InfoMessage

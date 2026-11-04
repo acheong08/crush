@@ -1258,12 +1258,10 @@ func quickStyle(o quickStyleOpts) Styles {
 	// badgeInk swaps it for fgBase where that reads better (light themes).
 	s.Status.SuccessIndicator = base.Foreground(badgeInk(o.success, o.bgLessVisible, o.fgBase)).Background(o.success).Padding(0, 1).Bold(true).SetString("OKAY!")
 	s.Status.InfoIndicator = s.Status.SuccessIndicator
-	s.Status.UpdateIndicator = s.Status.SuccessIndicator.SetString("HEY!")
 	s.Status.WarnIndicator = s.Status.SuccessIndicator.Foreground(badgeInk(o.warning, o.bgMostVisible, o.fgBase)).Background(o.warning).SetString("WARNING")
 	s.Status.ErrorIndicator = s.Status.SuccessIndicator.Foreground(badgeInk(o.destructive, o.bgBase, o.fgBase)).Background(o.destructive).SetString("ERROR")
 	s.Status.SuccessMessage = base.Foreground(badgeInk(o.successMostSubtle, o.bgLessVisible, o.fgBase)).Background(o.successMostSubtle).Padding(0, 1)
 	s.Status.InfoMessage = s.Status.SuccessMessage
-	s.Status.UpdateMessage = s.Status.SuccessMessage
 	s.Status.WarnMessage = s.Status.SuccessMessage.Foreground(badgeInk(o.warningSubtle, o.bgMostVisible, o.fgBase)).Background(o.warningSubtle)
 	s.Status.ErrorMessage = s.Status.SuccessMessage.Foreground(o.onPrimary).Background(o.error)
 

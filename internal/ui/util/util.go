@@ -32,7 +32,6 @@ const (
 	InfoTypeSuccess
 	InfoTypeWarn
 	InfoTypeError
-	InfoTypeUpdate
 	InfoTypePlan
 	InfoTypeYolo
 	InfoTypeSysadmin

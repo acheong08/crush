@@ -14,7 +14,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/crush/internal/agent/tools/mcp"
-	"github.com/charmbracelet/crush/internal/app"
 	"github.com/charmbracelet/crush/internal/client"
 	"github.com/charmbracelet/crush/internal/commands"
 	"github.com/charmbracelet/crush/internal/message"
@@ -296,31 +295,6 @@ func TestTranslateEvent_HostTheme(t *testing.T) {
 	got, ok = out.(HostThemeEvent)
 	require.True(t, ok, "expected HostThemeEvent, got %T", out)
 	require.Nil(t, got.Theme)
-}
-
-// TestTranslateEvent_UpdateAvailable verifies that an incoming
-// proto.UpdateAvailable event is converted back into the
-// app.UpdateAvailableMsg that the TUI expects, so client/server mode
-// shows the same update notification as local mode.
-func TestTranslateEvent_UpdateAvailable(t *testing.T) {
-	t.Parallel()
-
-	w := NewClientWorkspace(nil, proto.Workspace{})
-	ev := pubsub.Event[proto.UpdateAvailable]{
-		Type: pubsub.UpdatedEvent,
-		Payload: proto.UpdateAvailable{
-			CurrentVersion: "1.0.0",
-			LatestVersion:  "1.1.0",
-			IsDevelopment:  true,
-		},
-	}
-
-	out := w.translateEvent(ev)
-	got, ok := out.(app.UpdateAvailableMsg)
-	require.True(t, ok, "expected app.UpdateAvailableMsg, got %T", out)
-	require.Equal(t, "1.0.0", got.CurrentVersion)
-	require.Equal(t, "1.1.0", got.LatestVersion)
-	require.True(t, got.IsDevelopment)
 }
 
 func TestClientWorkspaceListMCPPrompts(t *testing.T) {

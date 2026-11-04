@@ -641,13 +641,11 @@ type Styles struct {
 		ErrorIndicator   lipgloss.Style
 		WarnIndicator    lipgloss.Style
 		InfoIndicator    lipgloss.Style
-		UpdateIndicator  lipgloss.Style
 		SuccessIndicator lipgloss.Style
 
 		ErrorMessage   lipgloss.Style
 		WarnMessage    lipgloss.Style
 		InfoMessage    lipgloss.Style
-		UpdateMessage  lipgloss.Style
 		SuccessMessage lipgloss.Style
 	}
 

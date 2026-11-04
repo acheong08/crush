@@ -13,7 +13,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/crush/internal/agent/notify"
 	"github.com/charmbracelet/crush/internal/agent/tools/mcp"
-	"github.com/charmbracelet/crush/internal/app"
 	"github.com/charmbracelet/crush/internal/client"
 	"github.com/charmbracelet/crush/internal/commands"
 	"github.com/charmbracelet/crush/internal/config"
@@ -1399,12 +1398,6 @@ func (w *ClientWorkspace) translateEvent(ev any) tea.Msg {
 		return pubsub.Event[skills.Event]{
 			Type:    e.Type,
 			Payload: skills.Event{States: states},
-		}
-	case pubsub.Event[proto.UpdateAvailable]:
-		return app.UpdateAvailableMsg{
-			CurrentVersion: e.Payload.CurrentVersion,
-			LatestVersion:  e.Payload.LatestVersion,
-			IsDevelopment:  e.Payload.IsDevelopment,
 		}
 	case pubsub.Event[proto.HostThemeState]:
 		theme := e.Payload.Theme

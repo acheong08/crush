@@ -28,12 +28,10 @@ func badgesOf(s Styles, o quickStyleOpts) []badge {
 	return []badge{
 		{"Status.SuccessIndicator", s.Status.SuccessIndicator, o.success, o.bgLessVisible},
 		{"Status.InfoIndicator", s.Status.InfoIndicator, o.success, o.bgLessVisible},
-		{"Status.UpdateIndicator", s.Status.UpdateIndicator, o.success, o.bgLessVisible},
 		{"Status.WarnIndicator", s.Status.WarnIndicator, o.warning, o.bgMostVisible},
 		{"Status.ErrorIndicator", s.Status.ErrorIndicator, o.destructive, o.bgBase},
 		{"Status.SuccessMessage", s.Status.SuccessMessage, o.successMostSubtle, o.bgLessVisible},
 		{"Status.InfoMessage", s.Status.InfoMessage, o.successMostSubtle, o.bgLessVisible},
-		{"Status.UpdateMessage", s.Status.UpdateMessage, o.successMostSubtle, o.bgLessVisible},
 		{"Status.WarnMessage", s.Status.WarnMessage, o.warningSubtle, o.bgMostVisible},
 		{"Status.ModeBadgeYolo", s.Status.ModeBadgeYolo, o.busy, o.bgBase},
 		{"Status.ModeBannerYolo", s.Status.ModeBannerYolo, o.yolo, o.bgBase},

@@ -267,12 +267,6 @@ func (c *Client) SubscribeEvents(ctx context.Context, id string) (<-chan any, er
 				if !sendEvent(ctx, events, e) {
 					return
 				}
-			case pubsub.PayloadTypeUpdateAvailable:
-				var e pubsub.Event[proto.UpdateAvailable]
-				_ = json.Unmarshal(p.Payload, &e)
-				if !sendEvent(ctx, events, e) {
-					return
-				}
 			case pubsub.PayloadTypeHostTheme:
 				var e pubsub.Event[proto.HostThemeState]
 				_ = json.Unmarshal(p.Payload, &e)
