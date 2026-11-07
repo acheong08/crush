@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -258,7 +259,7 @@ func Load(ctx context.Context, workingDir, dataDir string, debug bool) (*ConfigS
 		config:         cfg,
 		workingDir:     workingDir,
 		globalDataPath: GlobalConfigData(),
-		workspacePath:  filepath.Join(cfg.Options.DataDirectory, fmt.Sprintf("%s.json", appName)),
+		workspacePath:  filepath.Join(cfg.Options.StateDirectory, fmt.Sprintf("%s.json", appName)),
 		loadedPaths:    loadedPaths,
 	}
 
@@ -274,10 +275,10 @@ func Load(ctx context.Context, workingDir, dataDir string, debug bool) (*ConfigS
 		wsData = migrateCatwalkV2File(store.workspacePath, wsData)
 		merged, mergeErr := loadFromBytes(append([][]byte{mustMarshalConfig(cfg)}, wsData))
 		if mergeErr == nil {
-			// Preserve defaults that setDefaults already applied.
-			dataDir := cfg.Options.DataDirectory
+			// Preserve the resolved state directory across the merge.
+			stateDir := cfg.Options.StateDirectory
 			*cfg = *merged
-			cfg.setDefaults(workingDir, dataDir)
+			cfg.setDefaults(workingDir, stateDir)
 			store.config = cfg
 			store.loadedPaths = append(store.loadedPaths, store.workspacePath)
 		}
@@ -725,7 +726,10 @@ func (c *Config) NormalizeOptions() {
 	}
 }
 
-func (c *Config) setDefaults(workingDir, dataDir string) {
+// setDefaults fills in resolved defaults. stateDir, when non-empty, forces
+// the runtime state directory (an explicit override); otherwise it is derived
+// from workingDir. DataDirectory (config discovery) is resolved independently.
+func (c *Config) setDefaults(workingDir, stateDir string) {
 	c.NormalizeOptions()
 	if len(c.Options.GlobalContextPaths) == 0 {
 		crushConfigDir := filepath.Dir(GlobalConfig())
@@ -737,9 +741,7 @@ func (c *Config) setDefaults(workingDir, dataDir string) {
 	slices.Sort(c.Options.GlobalContextPaths)
 	c.Options.GlobalContextPaths = slices.Compact(c.Options.GlobalContextPaths)
 
-	if dataDir != "" {
-		c.Options.DataDirectory = dataDir
-	} else if c.Options.DataDirectory == "" {
+	if c.Options.DataDirectory == "" {
 		if path, ok := fsext.LookupClosestBounded(workingDir, projectBoundary(workingDir), defaultDataDirectory); ok {
 			c.Options.DataDirectory = path
 		} else {
@@ -747,6 +749,18 @@ func (c *Config) setDefaults(workingDir, dataDir string) {
 		}
 	}
 	c.Options.DataDirectory = filepath.Clean(filepathext.SmartJoin(workingDir, c.Options.DataDirectory))
+
+	// StateDirectory holds runtime state (database, logs, background job
+	// output). It defaults to a centralized per-project location so Crush
+	// no longer creates a .crush directory in every project. An explicit
+	// override (--data-dir or the backend's requested dir) wins.
+	if stateDir != "" {
+		c.Options.StateDirectory = stateDir
+	}
+	if c.Options.StateDirectory == "" {
+		c.Options.StateDirectory = defaultStateDir(workingDir)
+	}
+	c.Options.StateDirectory = filepath.Clean(filepathext.SmartJoin(workingDir, c.Options.StateDirectory))
 	if c.Providers == nil {
 		c.Providers = csync.NewMap[string, ProviderConfig]()
 	}
@@ -1347,6 +1361,59 @@ func shellConfigSibling(jsonPath string) string {
 func isShellConfig(path string) bool {
 	base := filepath.Base(path)
 	return base == appName+"rc" || base == "."+appName+"rc"
+}
+
+// GlobalStateDir returns the base directory for per-project runtime state
+// (databases, logs, background output). It follows the XDG state directory
+// convention so Crush keeps its state out of the working tree.
+func GlobalStateDir() string {
+	if crushState := os.Getenv("CRUSH_STATE_DIR"); crushState != "" {
+		return crushState
+	}
+	if xdgStateHome := os.Getenv("XDG_STATE_HOME"); xdgStateHome != "" {
+		return filepath.Join(xdgStateHome, appName)
+	}
+	if runtime.GOOS == "windows" {
+		localAppData := cmp.Or(
+			os.Getenv("LOCALAPPDATA"),
+			filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Local"),
+		)
+		return filepath.Join(localAppData, appName, "state")
+	}
+	return filepath.Join(home.Dir(), ".local", "state", appName)
+}
+
+// defaultStateDir returns the centralized per-project state directory for the
+// given working directory. The project boundary (git root when available) is
+// used so subdirectories of the same repository share a single state
+// directory, and a hash keeps distinct projects with the same name apart.
+func defaultStateDir(workingDir string) string {
+	root := projectBoundary(workingDir)
+	if abs, err := filepath.Abs(root); err == nil {
+		root = abs
+	}
+	sum := sha256.Sum256([]byte(root))
+	slug := slugifyProjectName(filepath.Base(root))
+	return filepath.Join(GlobalStateDir(), "projects", fmt.Sprintf("%s-%x", slug, sum[:4]))
+}
+
+// slugifyProjectName turns a directory name into a filesystem-safe slug,
+// keeping letters, digits, dashes, and underscores.
+func slugifyProjectName(name string) string {
+	var b strings.Builder
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_':
+			b.WriteRune(r)
+		default:
+			b.WriteByte('-')
+		}
+	}
+	slug := strings.Trim(b.String(), "-")
+	if slug == "" {
+		return "project"
+	}
+	return slug
 }
 
 // GlobalCacheDir returns the path to the global cache directory for the

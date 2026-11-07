@@ -581,10 +581,17 @@
         },
         "data_directory": {
           "type": "string",
-          "description": "Directory for storing application data. Relative paths are resolved against the working directory; absolute paths are used as-is.",
+          "description": "Per-project config directory (overrides",
           "default": ".crush",
           "examples": [
             ".crush"
+          ]
+        },
+        "state_directory": {
+          "type": "string",
+          "description": "Per-project runtime state directory (database",
+          "examples": [
+            "~/.local/state/crush"
           ]
         },
         "disabled_tools": {

@@ -96,7 +96,7 @@ type ConfigStore struct {
 	workingDir         string
 	resolver           VariableResolver
 	globalDataPath     string   // ~/.local/share/crush/crush.json
-	workspacePath      string   // .crush/crush.json
+	workspacePath      string   // <state-dir>/crush.json
 	loadedPaths        []string // config files that were successfully loaded
 	knownProviders     []catwalk.Provider
 	overrides          RuntimeOverrides
@@ -1439,14 +1439,16 @@ func (s *ConfigStore) reloadFromDiskLocked(ctx context.Context) error {
 	}
 
 	// Apply defaults (using existing data directory if set)
-	var dataDir string
+	// Apply defaults, preserving the resolved state directory across reloads
+	// so an explicit override (or the defaulted per-project location) is kept.
+	var stateDir string
 	if cur := s.Config(); cur != nil && cur.Options != nil {
-		dataDir = cur.Options.DataDirectory
+		stateDir = cur.Options.StateDirectory
 	}
-	cfg.setDefaults(s.workingDir, dataDir)
+	cfg.setDefaults(s.workingDir, stateDir)
 
 	// Merge workspace config if present
-	workspacePath := filepath.Join(cfg.Options.DataDirectory, fmt.Sprintf("%s.json", appName))
+	workspacePath := filepath.Join(cfg.Options.StateDirectory, fmt.Sprintf("%s.json", appName))
 	if wsData, err := readFile(workspacePath); err == nil && len(wsData) > 0 {
 		if !json.Valid(wsData) {
 			return fmt.Errorf("invalid JSON in config file %s", workspacePath)
@@ -1454,9 +1456,9 @@ func (s *ConfigStore) reloadFromDiskLocked(ctx context.Context) error {
 		wsData = migrateCatwalkV2File(workspacePath, wsData)
 		merged, mergeErr := loadFromBytes(append([][]byte{mustMarshalConfig(cfg)}, wsData))
 		if mergeErr == nil {
-			dataDir := cfg.Options.DataDirectory
+			stateDir := cfg.Options.StateDirectory
 			*cfg = *merged
-			cfg.setDefaults(s.workingDir, dataDir)
+			cfg.setDefaults(s.workingDir, stateDir)
 			loadedPaths = append(loadedPaths, workspacePath)
 		}
 	}

@@ -33,7 +33,7 @@ func ProjectNeedsInitialization(store *ConfigStore) (bool, error) {
 	}
 
 	cfg := store.Config()
-	flagFilePath := filepath.Join(cfg.Options.DataDirectory, InitFlagFilename)
+	flagFilePath := filepath.Join(cfg.Options.StateDirectory, InitFlagFilename)
 
 	_, err := os.Stat(flagFilePath)
 	if err == nil {
@@ -105,7 +105,11 @@ func MarkProjectInitialized(store *ConfigStore) error {
 	if store == nil {
 		return fmt.Errorf("config not loaded")
 	}
-	flagFilePath := filepath.Join(store.Config().Options.DataDirectory, InitFlagFilename)
+	flagFilePath := filepath.Join(store.Config().Options.StateDirectory, InitFlagFilename)
+
+	if err := os.MkdirAll(store.Config().Options.StateDirectory, 0o700); err != nil {
+		return fmt.Errorf("failed to create state directory: %w", err)
+	}
 
 	file, err := os.Create(flagFilePath)
 	if err != nil {

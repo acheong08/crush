@@ -347,27 +347,24 @@ func setupLocalWorkspace(cmd *cobra.Command) (workspace.Workspace, func(), error
 		store.Overrides().PermissionMode = permission.PermissionModeYolo
 	}
 
-	if err := os.MkdirAll(cfg.Options.DataDirectory, 0o700); err != nil {
-		return nil, nil, fmt.Errorf("failed to create data directory: %q %w", cfg.Options.DataDirectory, err)
+	if err := config.MigrateLegacyState(store); err != nil {
+		slog.Warn("Failed to migrate legacy state", "error", err)
 	}
 
-	gitIgnorePath := filepath.Join(cfg.Options.DataDirectory, ".gitignore")
-	if _, err := os.Stat(gitIgnorePath); os.IsNotExist(err) {
-		if err := os.WriteFile(gitIgnorePath, []byte("*\n"), 0o644); err != nil {
-			return nil, nil, fmt.Errorf("failed to create .gitignore file: %q %w", gitIgnorePath, err)
-		}
+	if err := os.MkdirAll(cfg.Options.StateDirectory, 0o700); err != nil {
+		return nil, nil, fmt.Errorf("failed to create state directory: %q %w", cfg.Options.StateDirectory, err)
 	}
 
-	if err := projects.Register(cwd, cfg.Options.DataDirectory); err != nil {
+	if err := projects.Register(cwd, cfg.Options.StateDirectory); err != nil {
 		slog.Warn("Failed to register project", "error", err)
 	}
 
-	conn, err := db.Connect(ctx, cfg.Options.DataDirectory)
+	conn, err := db.Connect(ctx, cfg.Options.StateDirectory)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	logFile := filepath.Join(cfg.Options.DataDirectory, "logs", "crush.log")
+	logFile := filepath.Join(cfg.Options.StateDirectory, "logs", "crush.log")
 	crushlog.Setup(logFile, debug)
 
 	// Discover skills once before app.New. Local mode hosts a single
@@ -498,7 +495,7 @@ func connectToServer(cmd *cobra.Command) (*client.Client, *proto.Workspace, func
 	}
 
 	if ws.Config != nil {
-		logFile := filepath.Join(ws.Config.Options.DataDirectory, "logs", "crush.log")
+		logFile := filepath.Join(ws.Config.Options.StateDirectory, "logs", "crush.log")
 		crushlog.Setup(logFile, debug)
 	}
 

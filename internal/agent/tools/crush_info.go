@@ -401,6 +401,7 @@ func writeOptions(b *strings.Builder, cfg *config.ConfigStore) {
 	var opts []kv
 
 	opts = append(opts, kv{"data_directory", c.Options.DataDirectory})
+	opts = append(opts, kv{"state_directory", c.Options.StateDirectory})
 	opts = append(opts, kv{"debug", fmt.Sprintf("%v", c.Options.Debug)})
 	autoLSP := c.Options.AutoLSP == nil || *c.Options.AutoLSP
 	opts = append(opts, kv{"auto_lsp", fmt.Sprintf("%v", autoLSP)})

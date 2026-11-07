@@ -455,11 +455,15 @@ func (b *Backend) CreateWorkspace(args proto.Workspace) (*Workspace, proto.Works
 	cfg.Overrides().EnabledChannels = args.Channels
 	cfg.Overrides().PermissionMode = proto.ProtoModeToPermission(args.PermissionMode)
 
-	if err := createDotCrushDir(cfg.Config().Options.DataDirectory); err != nil {
-		return nil, proto.Workspace{}, fmt.Errorf("failed to create data directory: %w", err)
+	if err := config.MigrateLegacyState(cfg); err != nil {
+		slog.Warn("Failed to migrate legacy state", "error", err)
 	}
 
-	conn, err := db.Connect(b.ctx, cfg.Config().Options.DataDirectory, db.WithDataDirLock(true))
+	if err := createStateDir(cfg.Config().Options.StateDirectory); err != nil {
+		return nil, proto.Workspace{}, fmt.Errorf("failed to create state directory: %w", err)
+	}
+
+	conn, err := db.Connect(b.ctx, cfg.Config().Options.StateDirectory, db.WithDataDirLock(true))
 	if err != nil {
 		return nil, proto.Workspace{}, fmt.Errorf("failed to connect to database: %w", err)
 	}
@@ -1238,7 +1242,7 @@ func workspaceToProto(ws *Workspace) proto.Workspace {
 		Path:           ws.Path,
 		PermissionMode: proto.PermissionModeToProto(ws.Permissions.PermissionMode()),
 		Channels:       ws.Cfg.Overrides().EnabledChannels,
-		DataDir:        cfg.Options.DataDirectory,
+		DataDir:        cfg.Options.StateDirectory,
 		Debug:          cfg.Options.Debug,
 		Config:         cfg,
 		Version:        version.Version,
@@ -1267,7 +1271,7 @@ func logFirstWinsMismatch(existing *Workspace, args proto.Workspace) {
 	requestedMode := proto.ProtoModeToPermission(args.PermissionMode)
 	if existingMode == requestedMode &&
 		existingCfg.Options.Debug == args.Debug &&
-		existingCfg.Options.DataDirectory == args.DataDir &&
+		existingCfg.Options.StateDirectory == args.DataDir &&
 		stringSlicesEqual(existingChannels, args.Channels) {
 		return
 	}
@@ -1279,7 +1283,7 @@ func logFirstWinsMismatch(existing *Workspace, args proto.Workspace) {
 		"requested_permission_mode", proto.PermissionModeToProto(requestedMode),
 		"existing_debug", existingCfg.Options.Debug,
 		"requested_debug", args.Debug,
-		"existing_data_dir", existingCfg.Options.DataDirectory,
+		"existing_data_dir", existingCfg.Options.StateDirectory,
 		"requested_data_dir", args.DataDir,
 		"existing_channels", existingChannels,
 		"requested_channels", args.Channels,

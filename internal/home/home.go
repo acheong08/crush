@@ -29,9 +29,11 @@ var testIgnoredEnv = []string{
 	"CRUSH_GLOBAL_CONFIG",
 	"CRUSH_GLOBAL_DATA",
 	"CRUSH_DATA_DIR",
+	"CRUSH_STATE_DIR",
 	"XDG_CONFIG_HOME",
 	"XDG_DATA_HOME",
 	"XDG_CACHE_HOME",
+	"XDG_STATE_HOME",
 }
 
 func init() {

@@ -299,7 +299,7 @@ func (b *Backend) RunShellCommand(ctx context.Context, workspaceID string, req p
 	// system temp directory.
 	var dataDir string
 	if ws.Cfg != nil {
-		dataDir = ws.Cfg.Config().Options.DataDirectory
+		dataDir = ws.Cfg.Config().Options.StateDirectory
 	}
 
 	var persist shell.PersistFunc

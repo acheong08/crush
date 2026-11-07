@@ -48,14 +48,14 @@ func TestLoadDataDirEnv(t *testing.T) {
 	t.Setenv("CRUSH_GLOBAL_DATA", t.TempDir())
 	t.Setenv("CRUSH_DISABLE_PROVIDER_AUTO_UPDATE", "1")
 
-	t.Run("CRUSH_DATA_DIR overrides the project data directory", func(t *testing.T) {
+	t.Run("CRUSH_DATA_DIR overrides the project state directory", func(t *testing.T) {
 		workDir := t.TempDir()
 		dataDir := t.TempDir()
 		t.Setenv("CRUSH_DATA_DIR", dataDir)
 
 		store, err := Load(t.Context(), workDir, "", false)
 		require.NoError(t, err)
-		require.Equal(t, dataDir, store.Config().Options.DataDirectory)
+		require.Equal(t, dataDir, store.Config().Options.StateDirectory)
 	})
 
 	t.Run("an explicit data directory wins over CRUSH_DATA_DIR", func(t *testing.T) {
@@ -65,7 +65,7 @@ func TestLoadDataDirEnv(t *testing.T) {
 
 		store, err := Load(t.Context(), workDir, dataDir, false)
 		require.NoError(t, err)
-		require.Equal(t, dataDir, store.Config().Options.DataDirectory)
+		require.Equal(t, dataDir, store.Config().Options.StateDirectory)
 	})
 
 	t.Run("relative CRUSH_DATA_DIR resolves against the working directory", func(t *testing.T) {
@@ -74,7 +74,7 @@ func TestLoadDataDirEnv(t *testing.T) {
 
 		store, err := Load(t.Context(), workDir, "", false)
 		require.NoError(t, err)
-		require.Equal(t, filepath.Join(workDir, "state"), store.Config().Options.DataDirectory)
+		require.Equal(t, filepath.Join(workDir, "state"), store.Config().Options.StateDirectory)
 	})
 }
 
@@ -356,13 +356,14 @@ func TestConfig_setDefaults(t *testing.T) {
 		require.Equal(t, workingDir, cfg.Options.DataDirectory)
 	})
 
-	t.Run("resolves relative flag data directory from working directory", func(t *testing.T) {
+	t.Run("resolves relative flag state directory from working directory", func(t *testing.T) {
 		cfg := &Config{}
 		workingDir := filepath.Join(t.TempDir(), "worktree")
 
 		cfg.setDefaults(workingDir, "./state")
 
-		require.Equal(t, filepath.Join(workingDir, "state"), cfg.Options.DataDirectory)
+		require.Equal(t, filepath.Join(workingDir, "state"), cfg.Options.StateDirectory)
+		require.Equal(t, filepath.Join(workingDir, defaultDataDirectory), cfg.Options.DataDirectory)
 	})
 
 	t.Run("preserves absolute configured data directory", func(t *testing.T) {

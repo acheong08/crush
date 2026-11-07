@@ -925,7 +925,9 @@ your explicit model fields win on conflicts.
 ## Logging
 
 Sometimes you need to look at logs. Luckily, Crush logs all sorts of
-stuff. Logs are stored in `./.crush/logs/crush.log` relative to the project.
+stuff. Logs are stored in the per-project state directory, which defaults to
+`~/.local/state/crush/projects/<project>/logs/crush.log` (following the
+`XDG_STATE_HOME` convention) rather than inside the project itself.
 
 The CLI also contains some helper commands to make perusing recent logs easier:
 

@@ -223,7 +223,7 @@ func New(ctx context.Context, conn *sql.DB, store *config.ConfigStore, skillsMgr
 
 	// Release the shared database connection on shutdown. The pool
 	// closes the underlying *sql.DB when the last reference is released.
-	dataDir := cfg.Options.DataDirectory
+	dataDir := cfg.Options.StateDirectory
 	app.cleanupFuncs = append(
 		app.cleanupFuncs,
 		func(context.Context) error { return db.Release(dataDir) },

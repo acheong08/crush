@@ -461,11 +461,18 @@ type Options struct {
 	Debug                bool        `json:"debug,omitempty" jsonschema:"description=Enable debug logging,default=false"`
 	DebugLSP             bool        `json:"debug_lsp,omitempty" jsonschema:"description=Enable debug logging for LSP servers,default=false"`
 	DisableAutoSummarize bool        `json:"disable_auto_summarize,omitempty" jsonschema:"description=Disable automatic conversation summarization,default=false"`
-	// DataDirectory is where Crush keeps per-project state such as
-	// the SQLite database and workspace overrides. Relative paths are
-	// resolved against the working directory; absolute paths are used
-	// verbatim. After defaulting the stored value is always absolute.
-	DataDirectory             string       `json:"data_directory,omitempty" jsonschema:"description=Directory for storing application data. Relative paths are resolved against the working directory; absolute paths are used as-is.,default=.crush,example=.crush"`
+	// DataDirectory is the per-project config directory Crush reads
+	// overrides, skills, and commands from. Relative paths are resolved
+	// against the working directory; absolute paths are used verbatim.
+	// After defaulting the stored value is always absolute.
+	DataDirectory string `json:"data_directory,omitempty" jsonschema:"description=Per-project config directory (overrides, skills, commands). Relative paths are resolved against the working directory; absolute paths are used as-is.,default=.crush,example=.crush"`
+	// StateDirectory is where Crush keeps per-project runtime state such
+	// as the SQLite database, logs, and background job output. It defaults
+	// to a centralized location under the user state directory
+	// (~/.local/state/crush) instead of a .crush directory in the project,
+	// so Crush never litters the working tree. Relative paths are resolved
+	// against the working directory; absolute paths are used verbatim.
+	StateDirectory            string       `json:"state_directory,omitempty" jsonschema:"description=Per-project runtime state directory (database, logs, background output). Defaults to a centralized per-project location under ~/.local/state/crush. Relative paths are resolved against the working directory; absolute paths are used as-is.,example=~/.local/state/crush"`
 	DisabledTools             []string     `json:"disabled_tools,omitempty" jsonschema:"description=List of built-in tools to disable and hide from the agent,example=bash,example=sourcegraph"`
 	DisableProviderAutoUpdate bool         `json:"disable_provider_auto_update,omitempty" jsonschema:"description=Disable providers auto-update,default=false"`
 	DisableDefaultProviders   bool         `json:"disable_default_providers,omitempty" jsonschema:"description=Ignore all default/embedded providers. When enabled\\, providers must be fully specified in the config file with base_url\\, models\\, and api_key - no merging with defaults occurs,default=false"`

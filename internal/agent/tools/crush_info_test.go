@@ -212,6 +212,7 @@ func TestCrushInfo_Options(t *testing.T) {
 		Providers: csync.NewMap[string, config.ProviderConfig](),
 		Options: &config.Options{
 			DataDirectory:        "/Users/user/project/.crush",
+			StateDirectory:       "/Users/user/.local/state/crush/projects/project-a1b2c3d4",
 			Debug:                true,
 			DisableAutoSummarize: true,
 		},
@@ -222,6 +223,7 @@ func TestCrushInfo_Options(t *testing.T) {
 	require.Contains(t, output, "auto_lsp = true")
 	require.Contains(t, output, "auto_summarize = false")
 	require.Contains(t, output, "data_directory = /Users/user/project/.crush")
+	require.Contains(t, output, "state_directory = /Users/user/.local/state/crush/projects/project-a1b2c3d4")
 	require.Contains(t, output, "debug = true")
 }
 

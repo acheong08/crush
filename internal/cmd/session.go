@@ -117,11 +117,13 @@ func sessionSetup(cmd *cobra.Command) (context.Context, *sessionServices, func()
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize config: %w", err)
 	}
-	if dataDir == "" {
-		dataDir = cfg.Config().Options.DataDirectory
-	}
+	dataDir = cfg.Config().Options.StateDirectory
 	if shouldEnableMetrics(cfg.Config()) {
 		event.Init()
+	}
+
+	if err := config.MigrateLegacyState(cfg); err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to migrate legacy state: %w", err)
 	}
 
 	conn, err := db.Connect(ctx, dataDir)

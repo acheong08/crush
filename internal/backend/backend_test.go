@@ -409,7 +409,7 @@ func TestPathDedupe_FullCreate(t *testing.T) {
 	wsA, protoA, err := b.CreateWorkspace(protoWS(cwd, dataDir, cidA))
 	require.NoError(t, err)
 	require.NotEmpty(t, protoA.ID)
-	require.Equal(t, protoA.DataDir, wsA.Cfg.Config().Options.DataDirectory)
+	require.Equal(t, protoA.DataDir, wsA.Cfg.Config().Options.StateDirectory)
 
 	wsB, protoB, err := b.CreateWorkspace(protoWS(cwd, dataDir, cidB))
 	require.NoError(t, err)

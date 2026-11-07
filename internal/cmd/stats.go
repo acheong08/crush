@@ -164,9 +164,10 @@ func runStats(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to initialize config: %w", err)
 		}
-		if dataDir == "" {
-			dataDir = cfg.Config().Options.DataDirectory
+		if err := config.MigrateLegacyState(cfg); err != nil {
+			return fmt.Errorf("failed to migrate legacy state: %w", err)
 		}
+		dataDir = cfg.Config().Options.StateDirectory
 		if shouldEnableMetrics(cfg.Config()) {
 			event.Init()
 		}
@@ -222,11 +223,11 @@ func runStats(cmd *cobra.Command, _ []string) error {
 	if outputDataDir == "" {
 		cfg, err := config.Init(cmd.Context(), cwd, "", false)
 		if err == nil {
-			outputDataDir = cfg.Config().Options.DataDirectory
+			outputDataDir = cfg.Config().Options.StateDirectory
 		}
 	}
 	if outputDataDir == "" {
-		outputDataDir = ".crush"
+		outputDataDir = config.GlobalStateDir()
 	}
 
 	htmlPath := filepath.Join(outputDataDir, "stats/index.html")
